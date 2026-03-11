@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <!-- Karakterkódolás beállítása -->
+  <meta charset="utf-8" />
+
+  <!-- Reszponzív megjelenés mobilon is -->
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Az oldal címe a böngésző fülön -->
+  <title>Supabase Notes – mini projekt</title>
+
+  <!-- Supabase JavaScript könyvtár betöltése CDN-ről -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body style="font-family: Arial; max-width: 800px; margin: 30px auto;">
+  <!-- Főcím -->
+  <h1>📝 Supabase Notes – mini projekt</h1>
+
+  <!-- Új jegyzet létrehozása -->
+  <h2>Új jegyzet</h2>
+
+  <!-- Űrlap új jegyzet mentéséhez -->
+  <form id="noteForm" style="display:grid; gap:10px;">
+    <!-- Jegyzet címe -->
+    <input id="title" placeholder="Cím" required />
+
+    <!-- Jegyzet szövege -->
+    <textarea id="content" placeholder="Jegyzet szövege" rows="5" required></textarea>
+
+    <!-- Mentés gomb -->
+    <button type="submit">Mentés</button>
+  </form>
+
+  <hr />
+
+  <!-- Jegyzetek lista -->
+  <h2>Jegyzetek</h2>
+  <div id="list"></div>
+
+  <script>
+    // A Supabase projekt URL-je
+    const SUPABASE_URL = 
+
+"IDE_JON_A_SAJAT_PROJEKT_URL"  ;
+
+    // A publikus anon kulcs
+    // Ez frontendben használható, de a service_role kulcsot ide TILOS tenni
+    const SUPABASE_ANON_KEY = "IDE_JON_A_SAJAT_ANON_KULCS";
+
+    // Supabase kliens létrehozása
+    // Ezzel tud a weboldal kapcsolódni a Supabase projekthez
+   //Settings -> API Keys -> 
+
+Legacy anon, service_role API keys:
+    const supabaseClient = window.supabase.createClient(
+      SUPABASE_URL=" ",
+      SUPABASE_ANON_KEY=" "
+    );
+
+    // Az űrlap és a jegyzetlista HTML elemének eltárolása változóba
+    const form = document.getElementById("noteForm");
+    const listEl = document.getElementById("list");
+
+    // Ez a függvény biztonságosan írja ki a szöveget a HTML-be
+    // Megakadályoz bizonyos rosszindulatú HTML / script beillesztéseket
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text ?? "";
+      return div.innerHTML;
+    }
+
+    // Jegyzetek betöltése az adatbázisból
+    async function loadNotes() {
+      // Lekérjük a notes táblából az adatokat
+      const { data, error } = await supabaseClient
+        .from("notes") // melyik táblából dolgozunk
+        .select("id, title, content, created_at") // mely mezőket kérjük le
+        .order("created_at", { ascending: false }); // legújabb legyen elöl
+
+      // Fejlesztői ellenőrzéshez konzolra is kiírjuk
+      console.log("SELECT:", data, error);
+
+      // Ha hiba történik a lekérdezéskor
+      if (error) {
+        listEl.innerHTML = `<p style="color:red;">SELECT hiba: ${escapeHtml(error.message)}</p>`;
+        return;
+      }
+
+      // Ha még nincs egyetlen jegyzet sem
+      if (!data || data.length === 0) {
+        listEl.innerHTML = `<p>Még nincs egyetlen jegyzet sem.</p>`;
+        return;
+      }
+
+      // A lekért adatokat HTML kártyákká alakítjuk
+      listEl.innerHTML = data.map(note => `
+        <div style="border:1px solid #ccc; padding:10px; margin:10px 0;">
+          <h3>${escapeHtml(note.title)}</h3>
+          <p>${escapeHtml(note.content)}</p>
+          <small>${escapeHtml(note.created_at)}</small>
+        </div>
+      `).join("");
+    }
+
+    // Eseményfigyelő az űrlap elküldésére
+    form.addEventListener("submit", async (e) => {
+      // Megakadályozzuk az alapértelmezett újratöltést
+      e.preventDefault();
+
+      // Kiolvassuk az inputmezők értékeit
+      const title = document.getElementById("title").value.trim();
+      const content = document.getElementById("content").value.trim();
+
+      // Ellenőrzés: egyik mező sem lehet üres
+      if (!title || !content) {
+        alert("Mindkét mező kitöltése kötelező.");
+        return;
+      }
+
+      // Fejlesztői ellenőrzéshez konzolra írjuk
+      console.log("Mentés indul:", { title, content });
+
+      // Új rekord beszúrása a notes táblába
+      const { data, error } = await supabaseClient
+        .from("notes")
+        .insert([{ title, content }]) // új sor beszúrása
+        .select(); // a frissen beszúrt sort visszakérjük
+
+      // Konzolra kiírjuk az eredményt
+      console.log("INSERT:", data, error);
+
+      // Ha hiba történik mentéskor
+      if (error) {
+        alert("INSERT hiba: " + error.message);
+        return;
+      }
+
+      // Sikeres mentés esetén
+      alert("Sikeres mentés!");
+
+      // Űrlap törlése
+      form.reset();
+
+      // Jegyzetlista újratöltése, hogy az új adat rögtön látszódjon
+      loadNotes();
+    });
+
+    // Az oldal megnyitásakor rögtön betöltjük a jegyzeteket
+    loadNotes();
+  </script>
+</body>
+</html>
